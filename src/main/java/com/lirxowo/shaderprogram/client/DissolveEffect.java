@@ -10,7 +10,7 @@ public class DissolveEffect {
     private static boolean enabled = false;
     private static float progress = 0.0f;
 
-    // ~1 second for full dissolve at 20 ticks/sec
+    // 以20tick/秒的速率，约1秒完成完整溶解
     private static final float SPEED = 0.01f;
 
     public static void toggle() {
@@ -33,13 +33,13 @@ public class DissolveEffect {
         }
     }
 
-    // Block dissolve uniforms (V key toggle)
+    // 方块溶解uniform（V键切换）
     private static boolean wasActive = false;
 
     public static void applyUniforms() {
         boolean isActive = progress > 0.001f;
 
-        // Skip only when fully idle (not active now, wasn't active last frame)
+        // 仅在完全空闲时跳过（当前未激活，上一帧也未激活）
         if (!isActive && !wasActive) return;
         wasActive = isActive;
 
@@ -49,7 +49,7 @@ public class DissolveEffect {
         setUniform(GameRenderer.getRendertypeTranslucentShader(), progress);
     }
 
-    // Entity dissolve uniforms (per-entity, for death animation)
+    // 实体溶解uniform（逐实体，用于死亡动画）
     public static void setEntityDissolveProgress(float entityProgress) {
         setUniform(GameRenderer.getRendertypeEntitySolidShader(), entityProgress);
         setUniform(GameRenderer.getRendertypeEntityCutoutShader(), entityProgress);

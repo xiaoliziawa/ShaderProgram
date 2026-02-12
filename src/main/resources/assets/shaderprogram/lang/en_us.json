@@ -1,0 +1,8 @@
+{
+  "tab.shaderprogram.name": "ShaderProgram",
+  "item.shaderprogram.time_clock": "Time Clock",
+  "key.shaderprogram.toggle_time_stop": "Toggle Time Stop",
+  "key.shaderprogram.toggle_dissolve": "Toggle Dissolve",
+  "key.shaderprogram.cycle_tile": "Cycle Tile",
+  "key.categories.shaderprogram": "ShaderProgram"
+}

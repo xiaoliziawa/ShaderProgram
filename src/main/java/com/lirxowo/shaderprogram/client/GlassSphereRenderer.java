@@ -21,7 +21,7 @@ public class GlassSphereRenderer extends EntityRenderer<GlassSphereEntity> {
     @Override
     public void render(GlassSphereEntity entity, float entityYaw, float partialTick,
                        PoseStack poseStack, MultiBufferSource bufferSource, int packedLight) {
-        // No-op: actual rendering happens at AFTER_WEATHER stage via ClientEvents
-        // so the captured framebuffer includes water, clouds, and weather effects.
+        // 空操作：实际渲染在AFTER_WEATHER阶段通过ClientEvents执行，
+        // 这样捕获的帧缓冲区包含水面、云层和天气效果。
     }
 }

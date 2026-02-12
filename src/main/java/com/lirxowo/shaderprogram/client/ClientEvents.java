@@ -42,6 +42,13 @@ public class ClientEvents {
             "key.categories.shaderprogram"
     );
 
+    private static final KeyMapping TIME_STOP_KEY = new KeyMapping(
+            "key.shaderprogram.toggle_time_stop",
+            InputConstants.Type.KEYSYM,
+            GLFW.GLFW_KEY_G,
+            "key.categories.shaderprogram"
+    );
+
     @EventBusSubscriber(modid = Shaderprogram.MODID, value = Dist.CLIENT)
     public static class ModBusEvents {
 
@@ -49,6 +56,7 @@ public class ClientEvents {
         public static void onRegisterKeyMappings(RegisterKeyMappingsEvent event) {
             event.register(DISSOLVE_KEY);
             event.register(TILE_KEY);
+            event.register(TIME_STOP_KEY);
         }
 
         @SubscribeEvent
@@ -78,7 +86,14 @@ public class ClientEvents {
             while (TILE_KEY.consumeClick()) {
                 TileEffect.cycle();
             }
+            while (TIME_STOP_KEY.consumeClick()) {
+                Minecraft mc = Minecraft.getInstance();
+                if (mc.player != null) {
+                    TimeStopEffect.toggle(mc.player);
+                }
+            }
             DissolveEffect.tick();
+            TimeStopEffect.tick();
         }
 
         @SubscribeEvent
@@ -86,6 +101,7 @@ public class ClientEvents {
             if (event.getStage() == RenderLevelStageEvent.Stage.AFTER_SKY) {
                 DissolveEffect.applyUniforms();
                 TileEffect.applyUniforms();
+                TimeStopEffect.applyPostUniforms();
             }
             if (event.getStage() == RenderLevelStageEvent.Stage.AFTER_WEATHER) {
                 renderGlassSpheres(event);
@@ -108,18 +124,18 @@ public class ClientEvents {
             );
             if (spheres.isEmpty()) return;
 
-            // Capture framebuffer — at AFTER_WEATHER, water, translucent blocks,
-            // particles, clouds, and weather are all already drawn.
+            // 捕获帧缓冲区 -- 在AFTER_WEATHER阶段，水面、半透明方块、
+            // 粒子、云层和天气效果都已经绘制完毕。
             GlassSphereShader.captureScene();
             if (GlassSphereShader.getCaptureTexId() == -1) return;
 
             float screenWidth = mc.getWindow().getWidth();
             float screenHeight = mc.getWindow().getHeight();
 
-            // Set up the model-view matrix to the camera view matrix,
-            // matching what entity rendering uses internally.
-            // At AFTER_WEATHER the model-view stack has been popped back,
-            // so we must re-apply the camera view matrix.
+            // 设置模型视图矩阵为相机视图矩阵，
+            // 与实体渲染内部使用的一致。
+            // 在AFTER_WEATHER阶段，模型视图堆栈已被弹出，
+            // 所以必须重新应用相机视图矩阵。
             Matrix4f viewMatrix = new Matrix4f().rotation(
                     camera.rotation().conjugate(new Quaternionf())
             );
@@ -128,8 +144,8 @@ public class ClientEvents {
             modelViewStack.set(viewMatrix);
             RenderSystem.applyModelViewMatrix();
 
-            // Fresh identity PoseStack — same as entity rendering uses.
-            // Entity positions are relative to camera.
+            // 全新的单位PoseStack -- 与实体渲染使用的相同。
+            // 实体位置相对于相机。
             PoseStack poseStack = new PoseStack();
             Quaternionf billboard = mc.getEntityRenderDispatcher().cameraOrientation();
 
@@ -172,7 +188,7 @@ public class ClientEvents {
                 poseStack.popPose();
             }
 
-            // Restore the model-view stack
+            // 恢复模型视图堆栈
             modelViewStack.popMatrix();
             RenderSystem.applyModelViewMatrix();
         }

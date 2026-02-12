@@ -1,0 +1,8 @@
+{
+  "tab.shaderprogram.name": "ShaderProgram",
+  "item.shaderprogram.time_clock": "时间怀表",
+  "key.shaderprogram.toggle_time_stop": "切换时停效果",
+  "key.shaderprogram.toggle_dissolve": "切换溶解效果",
+  "key.shaderprogram.cycle_tile": "切换瓷砖效果",
+  "key.categories.shaderprogram": "ShaderProgram"
+}

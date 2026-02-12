@@ -1,0 +1,21 @@
+{
+  "targets": ["swap"],
+  "passes": [
+    {
+      "name": "shaderprogram:sp_rewind",
+      "intarget": "minecraft:main",
+      "outtarget": "swap",
+      "uniforms": [
+        {
+          "name": "RewindTime",
+          "values": [0.0]
+        }
+      ]
+    },
+    {
+      "name": "shaderprogram:sp_desaturate",
+      "intarget": "swap",
+      "outtarget": "minecraft:main"
+    }
+  ]
+}

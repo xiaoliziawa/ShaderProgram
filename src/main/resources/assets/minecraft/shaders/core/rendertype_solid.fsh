@@ -19,9 +19,6 @@ in vec3 chunkPos;
 
 out vec4 fragColor;
 
-// Based on original code by inigo quilez - iq/2013
-// https://www.shadertoy.com/view/ldl3W8
-// Modified by hadyn lander, ported for Minecraft block dissolve
 
 #define PHASE_POWER 2.0
 
@@ -84,27 +81,27 @@ void main() {
     vec4 color = texture(Sampler0, uv) * vertexColor * ColorModulator;
 
     if (DissolveProgress > 0.001) {
-        // Project 3D world position to 2D for Voronoi
+        // 将3D世界坐标投影到2D用于Voronoi计算
         vec2 p = chunkPos.xz + chunkPos.y * 0.37;
         p *= 0.8;
 
-        // DissolveProgress drives the wave sweep
+        // DissolveProgress驱动波浪扫描
         float timeStep = DissolveProgress * 2.0 - 0.5;
 
-        // Subtle drift from GameTime
+        // GameTime带来的微妙漂移
         float t = GameTime * 200.0;
         p += vec2(t * 0.02, t * 0.01);
 
         vec4 c = voronoi(p);
         c.x = 1.0 - pow(1.0 - c.x, 2.0);
 
-        // Cell phase — wave pattern per cell
+        // 单元格相位 -- 每个单元格的波浪图案
         float cellPhase = p.x + c.y + 2.0 * sin((p.y + c.z) * 0.8 + (p.x + c.y) * 0.4);
         cellPhase *= 0.025;
         cellPhase = clamp(abs(mod(cellPhase - timeStep, 1.0) - 0.5) * 2.0, 0.0, 1.0);
         cellPhase = pow(clamp(cellPhase * 2.0 - 0.5, 0.0, 1.0), PHASE_POWER);
 
-        // Edge phase — position-based wave ignoring cell assignment
+        // 边缘相位 -- 基于位置的波浪，忽略单元格分配
         float edgePhase = p.x + 2.0 * sin(p.y * 0.8 + p.x * 0.4);
         edgePhase *= 0.025;
         edgePhase = clamp(abs(mod(edgePhase - timeStep, 1.0) - 0.5) * 2.0, 0.0, 1.0);
@@ -112,11 +109,11 @@ void main() {
 
         float phase = mix(edgePhase, cellPhase, smoothstep(0.0, 0.2, edgePhase));
 
-        // phase ≈ 1 → wave has passed → dissolve (discard)
-        // phase ≈ 0 → wave hasn't reached → block still visible
+        // phase ≈ 1 → 波浪已经过 → 溶解（丢弃）
+        // phase ≈ 0 → 波浪未到达 → 方块仍可见
         if (phase > 0.95) discard;
 
-        // Voronoi coloring at the transition zone
+        // 过渡区域的Voronoi着色
         float shapedPhase = 1.0 - pow(1.0 - phase, 2.0);
         vec3 voronoiCol = mix(
             vec3(0.0, 0.6, 1.0),
@@ -128,7 +125,7 @@ void main() {
             )
         );
 
-        // Blend: low phase = normal blocks, increasing phase = Voronoi pattern
+        // 混合：低相位 = 正常方块，递增相位 = Voronoi图案
         color.rgb = mix(color.rgb, voronoiCol, smoothstep(0.0, 0.3, phase));
     }
 

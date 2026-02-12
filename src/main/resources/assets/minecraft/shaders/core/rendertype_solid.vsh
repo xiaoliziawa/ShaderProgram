@@ -32,8 +32,8 @@ void main() {
         float disp = DissolveProgress * DissolveProgress * 3.0;
         float t = GameTime * 2000.0;
 
-        // Only use Position-based displacement (not Normal) so shared-edge
-        // vertices always move identically — no seams between faces.
+        // 仅使用基于Position的位移（不使用Normal），以确保共享边
+        // 的顶点始终以相同方式移动 -- 面之间不会出现接缝。
         vec3 offset = vec3(0.0);
         offset.y += disp * (0.5 + h * 0.5);
         offset.x += sin(h * 6.283 + t) * disp * 0.3;
