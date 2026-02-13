@@ -57,15 +57,14 @@ public class EnchantGlintRenderer {
         RenderSystem.enableDepthTest();
         RenderSystem.disableCull();
 
-        // Bind vanilla enchantment glint texture
+        // Bind vanilla enchantment glint texture with GL_REPEAT wrapping
         int texId = mc.getTextureManager().getTexture(GLINT_TEXTURE).getId();
         RenderSystem.setShaderTexture(0, texId);
-        // Ensure the texture tiles when UVs exceed [0,1]
         GL11.glBindTexture(GL11.GL_TEXTURE_2D, texId);
         GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_S, GL11.GL_REPEAT);
         GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_T, GL11.GL_REPEAT);
 
-        // Camera view matrix (rotation only, no translation)
+        // Camera view matrix (rotation only)
         Matrix4f viewMatrix = new Matrix4f().rotation(
                 camera.rotation().conjugate(new Quaternionf())
         );
@@ -77,7 +76,7 @@ public class EnchantGlintRenderer {
         RenderSystem.setShader(() -> shader);
 
         BufferBuilder builder = Tesselator.getInstance().begin(
-                VertexFormat.Mode.TRIANGLES, DefaultVertexFormat.POSITION);
+                VertexFormat.Mode.TRIANGLES, DefaultVertexFormat.POSITION_TEX);
 
         int count = 0;
         for (Map.Entry<BlockPos, ItemEnchantments> entry : enchantedBlocks.entrySet()) {
@@ -107,55 +106,60 @@ public class EnchantGlintRenderer {
         RenderSystem.defaultBlendFunc();
     }
 
+    /**
+     * Build an axis-aligned cube with per-face UV coordinates (0-1).
+     * Each face's UV is derived from the two axes that vary on that face,
+     * so the glint pattern stays fixed to the block surface.
+     */
     private static void buildCube(BufferBuilder builder,
                                    float x0, float y0, float z0,
                                    float x1, float y1, float z1) {
-        // Bottom face (y = y0)
-        builder.addVertex(x0, y0, z1);
-        builder.addVertex(x1, y0, z1);
-        builder.addVertex(x1, y0, z0);
-        builder.addVertex(x0, y0, z1);
-        builder.addVertex(x1, y0, z0);
-        builder.addVertex(x0, y0, z0);
+        // Bottom face (y = y0) — UV from XZ
+        builder.addVertex(x0, y0, z1).setUv(0f, 1f);
+        builder.addVertex(x1, y0, z1).setUv(1f, 1f);
+        builder.addVertex(x1, y0, z0).setUv(1f, 0f);
+        builder.addVertex(x0, y0, z1).setUv(0f, 1f);
+        builder.addVertex(x1, y0, z0).setUv(1f, 0f);
+        builder.addVertex(x0, y0, z0).setUv(0f, 0f);
 
-        // Top face (y = y1)
-        builder.addVertex(x0, y1, z0);
-        builder.addVertex(x1, y1, z0);
-        builder.addVertex(x1, y1, z1);
-        builder.addVertex(x0, y1, z0);
-        builder.addVertex(x1, y1, z1);
-        builder.addVertex(x0, y1, z1);
+        // Top face (y = y1) — UV from XZ
+        builder.addVertex(x0, y1, z0).setUv(0f, 0f);
+        builder.addVertex(x1, y1, z0).setUv(1f, 0f);
+        builder.addVertex(x1, y1, z1).setUv(1f, 1f);
+        builder.addVertex(x0, y1, z0).setUv(0f, 0f);
+        builder.addVertex(x1, y1, z1).setUv(1f, 1f);
+        builder.addVertex(x0, y1, z1).setUv(0f, 1f);
 
-        // North face (z = z0)
-        builder.addVertex(x1, y0, z0);
-        builder.addVertex(x1, y1, z0);
-        builder.addVertex(x0, y1, z0);
-        builder.addVertex(x1, y0, z0);
-        builder.addVertex(x0, y1, z0);
-        builder.addVertex(x0, y0, z0);
+        // North face (z = z0) — UV from XY
+        builder.addVertex(x1, y0, z0).setUv(0f, 0f);
+        builder.addVertex(x1, y1, z0).setUv(0f, 1f);
+        builder.addVertex(x0, y1, z0).setUv(1f, 1f);
+        builder.addVertex(x1, y0, z0).setUv(0f, 0f);
+        builder.addVertex(x0, y1, z0).setUv(1f, 1f);
+        builder.addVertex(x0, y0, z0).setUv(1f, 0f);
 
-        // South face (z = z1)
-        builder.addVertex(x0, y0, z1);
-        builder.addVertex(x0, y1, z1);
-        builder.addVertex(x1, y1, z1);
-        builder.addVertex(x0, y0, z1);
-        builder.addVertex(x1, y1, z1);
-        builder.addVertex(x1, y0, z1);
+        // South face (z = z1) — UV from XY
+        builder.addVertex(x0, y0, z1).setUv(0f, 0f);
+        builder.addVertex(x0, y1, z1).setUv(0f, 1f);
+        builder.addVertex(x1, y1, z1).setUv(1f, 1f);
+        builder.addVertex(x0, y0, z1).setUv(0f, 0f);
+        builder.addVertex(x1, y1, z1).setUv(1f, 1f);
+        builder.addVertex(x1, y0, z1).setUv(1f, 0f);
 
-        // West face (x = x0)
-        builder.addVertex(x0, y0, z0);
-        builder.addVertex(x0, y1, z0);
-        builder.addVertex(x0, y1, z1);
-        builder.addVertex(x0, y0, z0);
-        builder.addVertex(x0, y1, z1);
-        builder.addVertex(x0, y0, z1);
+        // West face (x = x0) — UV from ZY
+        builder.addVertex(x0, y0, z0).setUv(0f, 0f);
+        builder.addVertex(x0, y1, z0).setUv(0f, 1f);
+        builder.addVertex(x0, y1, z1).setUv(1f, 1f);
+        builder.addVertex(x0, y0, z0).setUv(0f, 0f);
+        builder.addVertex(x0, y1, z1).setUv(1f, 1f);
+        builder.addVertex(x0, y0, z1).setUv(1f, 0f);
 
-        // East face (x = x1)
-        builder.addVertex(x1, y0, z1);
-        builder.addVertex(x1, y1, z1);
-        builder.addVertex(x1, y1, z0);
-        builder.addVertex(x1, y0, z1);
-        builder.addVertex(x1, y1, z0);
-        builder.addVertex(x1, y0, z0);
+        // East face (x = x1) — UV from ZY
+        builder.addVertex(x1, y0, z1).setUv(0f, 0f);
+        builder.addVertex(x1, y1, z1).setUv(0f, 1f);
+        builder.addVertex(x1, y1, z0).setUv(1f, 1f);
+        builder.addVertex(x1, y0, z1).setUv(0f, 0f);
+        builder.addVertex(x1, y1, z0).setUv(1f, 1f);
+        builder.addVertex(x1, y0, z0).setUv(1f, 0f);
     }
 }

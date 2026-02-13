@@ -76,7 +76,7 @@ public class ClientEvents {
             event.registerShader(
                     new ShaderInstance(event.getResourceProvider(),
                             "shaderprogram:enchant_glint",
-                            DefaultVertexFormat.POSITION),
+                            DefaultVertexFormat.POSITION_TEX),
                     instance -> EnchantGlintShader.instance = instance
             );
         }

@@ -22,8 +22,6 @@ import java.util.Map;
 @EventBusSubscriber(modid = Shaderprogram.MODID)
 public class EnchantedBlockEvents {
 
-    // Temporary storage: BreakEvent fires before BlockDropsEvent,
-    // so we stash enchantments here for the drops handler to pick up.
     private static final Map<BlockPos, ItemEnchantments> pendingDropEnchants = new HashMap<>();
 
     @SubscribeEvent
@@ -48,7 +46,6 @@ public class EnchantedBlockEvents {
         ItemEnchantments enchants = data.get(pos);
         if (enchants == null) return;
 
-        // Stash for BlockDropsEvent, then remove + notify clients
         pendingDropEnchants.put(pos.immutable(), enchants);
         EnchantedBlockManager.removeEnchantedBlock(level, pos);
     }
