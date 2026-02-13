@@ -3,41 +3,33 @@
 uniform sampler2D Sampler0;
 uniform float GameTime;
 uniform vec2 ScreenSize;
+uniform mat4 ModelViewMat;
 
-in vec2 texCoord0;
+in vec3 vObjPos;
+in vec3 vViewPos;
 
 out vec4 fragColor;
 
 void main() {
-    // 将公告板UV从[0,1]重映射到[-1,1]
-    vec2 uv = texCoord0 * 2.0 - 1.0;
+    // 从物体空间位置计算球体法线（球心在原点，normalize(pos) = 法线）
+    vec3 objNormal = normalize(vObjPos);
 
-    float dist2 = dot(uv, uv);
-    float sphereRadius = 0.85;
-    float r2 = sphereRadius * sphereRadius;
-
-    // 球体边缘抗锯齿
-    float edge = length(uv) - sphereRadius;
-    float aa = 1.0 - smoothstep(-fwidth(edge) * 1.5, fwidth(edge) * 1.5, edge);
-
-    if (aa < 0.001) {
-        discard;
+    // gl_FrontFacing == false 表示看到的是背面，即相机在球体内部
+    if (!gl_FrontFacing) {
+        objNormal = -objNormal;
     }
 
-    // 将距离限制在球体内部以保证sqrt安全
-    float safeDist2 = min(dist2, r2 - 0.001);
+    // 将法线变换到视图空间
+    // mat3(ModelViewMat) 提取旋转部分（平移不影响方向向量）
+    vec3 normal = normalize(mat3(ModelViewMat) * objNormal);
 
-    // 从公告板位置重建球体法线
-    float z = sqrt(r2 - safeDist2);
-    vec3 normal = normalize(vec3(uv.x, -uv.y, z));
-
-    // 视线方向（公告板面向相机，视线沿-Z轴）
-    vec3 viewDir = vec3(0.0, 0.0, -1.0);
+    // 逐像素视线方向（视图空间中相机在原点，vViewPos 是片段位置）
+    vec3 viewDir = normalize(vViewPos);
 
     float cosTheta = max(0.0, dot(-viewDir, normal));
 
     // ---- 折射 ----
-    float eta = 1.0 / 1.501; // 空气 -> 玻璃 折射率
+    float eta = 1.0 / 1.501; // 空气 -> 玻璃
     vec3 refrDir = refract(viewDir, normal, eta);
 
     // 使用折射偏移采样捕获的场景纹理
@@ -51,15 +43,17 @@ void main() {
 
     // ---- 反射 ----
     vec3 reflDir = reflect(viewDir, normal);
+    // 将反射方向变换回世界空间，让天空渐变不随相机旋转
+    vec3 worldRefl = transpose(mat3(ModelViewMat)) * reflDir;
 
     // 反射随时间缓慢旋转
     float angle = GameTime * 4000.0;
     float cosA = cos(angle);
     float sinA = sin(angle);
     vec3 rotRefl = vec3(
-        reflDir.x * cosA + reflDir.z * sinA,
-        reflDir.y,
-       -reflDir.x * sinA + reflDir.z * cosA
+        worldRefl.x * cosA + worldRefl.z * sinA,
+        worldRefl.y,
+       -worldRefl.x * sinA + worldRefl.z * cosA
     );
 
     // 程序化天空渐变
@@ -81,14 +75,15 @@ void main() {
     vec3 reflColor = skyColor;
 
     // ---- 菲涅尔效果（Schlick近似） ----
-    float F0 = 0.04; // 玻璃在法线入射角下的反射率
+    float F0 = 0.04;
     float fresnel = F0 + (1.0 - F0) * pow(1.0 - cosTheta, 5.0);
 
     // 混合折射和反射
     vec3 color = mix(refrColor, reflColor, fresnel);
 
     // ---- 镜面高光 ----
-    vec3 lightDir = normalize(vec3(0.5, 1.0, 0.3));
+    // 将世界空间光源方向变换到视图空间
+    vec3 lightDir = normalize(mat3(ModelViewMat) * normalize(vec3(0.5, 1.0, 0.3)));
     vec3 halfVec = normalize(lightDir - viewDir);
     float spec = pow(max(0.0, dot(normal, halfVec)), 128.0);
     color += vec3(1.0, 1.0, 0.98) * spec * 0.6;
@@ -104,5 +99,5 @@ void main() {
     float edgeDarken = pow(cosTheta, 0.35);
     color *= mix(0.5, 1.0, edgeDarken);
 
-    fragColor = vec4(color, aa * 0.92);
+    fragColor = vec4(color, 1.0);
 }

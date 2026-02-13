@@ -22,6 +22,7 @@ import org.joml.Matrix4f;
 import org.joml.Matrix4fStack;
 import org.joml.Quaternionf;
 import org.lwjgl.glfw.GLFW;
+import org.lwjgl.opengl.GL11;
 
 import java.io.IOException;
 import java.util.List;
@@ -69,8 +70,14 @@ public class ClientEvents {
             event.registerShader(
                     new ShaderInstance(event.getResourceProvider(),
                             "shaderprogram:glass_sphere",
-                            DefaultVertexFormat.POSITION_TEX),
+                            DefaultVertexFormat.POSITION),
                     instance -> GlassSphereShader.instance = instance
+            );
+            event.registerShader(
+                    new ShaderInstance(event.getResourceProvider(),
+                            "shaderprogram:enchant_glint",
+                            DefaultVertexFormat.POSITION),
+                    instance -> EnchantGlintShader.instance = instance
             );
         }
     }
@@ -105,6 +112,7 @@ public class ClientEvents {
             }
             if (event.getStage() == RenderLevelStageEvent.Stage.AFTER_WEATHER) {
                 renderGlassSpheres(event);
+                EnchantGlintRenderer.render(event);
             }
         }
 
@@ -132,45 +140,43 @@ public class ClientEvents {
             float screenWidth = mc.getWindow().getWidth();
             float screenHeight = mc.getWindow().getHeight();
 
-            // 设置模型视图矩阵为相机视图矩阵，
-            // 与实体渲染内部使用的一致。
-            // 在AFTER_WEATHER阶段，模型视图堆栈已被弹出，
-            // 所以必须重新应用相机视图矩阵。
+            // 相机视图矩阵（仅旋转，无平移）
             Matrix4f viewMatrix = new Matrix4f().rotation(
                     camera.rotation().conjugate(new Quaternionf())
             );
             Matrix4fStack modelViewStack = RenderSystem.getModelViewStack();
             modelViewStack.pushMatrix();
-            modelViewStack.set(viewMatrix);
-            RenderSystem.applyModelViewMatrix();
-
-            // 全新的单位PoseStack -- 与实体渲染使用的相同。
-            // 实体位置相对于相机。
-            PoseStack poseStack = new PoseStack();
-            Quaternionf billboard = mc.getEntityRenderDispatcher().cameraOrientation();
 
             for (GlassSphereEntity entity : spheres) {
-                double dx = entity.getX() - camPos.x;
-                double dy = entity.getY() - camPos.y;
-                double dz = entity.getZ() - camPos.z;
+                float dx = (float) (entity.getX() - camPos.x);
+                float dy = (float) (entity.getY() - camPos.y);
+                float dz = (float) (entity.getZ() - camPos.z);
 
-                poseStack.pushPose();
-                poseStack.translate(dx, dy, dz);
-                poseStack.mulPose(billboard);
+                // ModelViewMat = viewMatrix * T(dx,dy,dz)
+                // 这样顶点数据保持在物体空间（球心在原点），
+                // 着色器中 normalize(Position) 即为球体法线
+                modelViewStack.set(viewMatrix);
+                modelViewStack.translate(dx, dy, dz);
+                RenderSystem.applyModelViewMatrix();
 
-                Matrix4f matrix = poseStack.last().pose();
-                float halfSize = 2.5f;
+                float radius = 2.5f;
+                boolean cameraInside = dx * dx + dy * dy + dz * dz < radius * radius;
 
                 BufferBuilder builder = Tesselator.getInstance().begin(
-                        VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX);
-                builder.addVertex(matrix, -halfSize, -halfSize, 0).setUv(0, 0);
-                builder.addVertex(matrix,  halfSize, -halfSize, 0).setUv(1, 0);
-                builder.addVertex(matrix,  halfSize,  halfSize, 0).setUv(1, 1);
-                builder.addVertex(matrix, -halfSize,  halfSize, 0).setUv(0, 1);
+                        VertexFormat.Mode.TRIANGLES, DefaultVertexFormat.POSITION);
 
-                RenderSystem.enableBlend();
-                RenderSystem.defaultBlendFunc();
-                RenderSystem.depthMask(false);
+                buildSphere(builder, radius, 48, 24);
+
+                RenderSystem.depthMask(true);
+                RenderSystem.enableDepthTest();
+                RenderSystem.disableBlend();
+                RenderSystem.enableCull();
+
+                if (cameraInside) {
+                    // 相机在球内：剔除正面，只渲染内壁（背面）
+                    GL11.glCullFace(GL11.GL_FRONT);
+                }
+                // 相机在球外：默认剔除背面，只渲染外壁（正面）
 
                 RenderSystem.setShader(() -> shader);
                 RenderSystem.setShaderTexture(0, GlassSphereShader.getCaptureTexId());
@@ -182,15 +188,61 @@ public class ClientEvents {
 
                 BufferUploader.drawWithShader(builder.buildOrThrow());
 
-                RenderSystem.depthMask(true);
-                RenderSystem.disableBlend();
-
-                poseStack.popPose();
+                if (cameraInside) {
+                    GL11.glCullFace(GL11.GL_BACK); // 恢复默认
+                }
             }
 
             // 恢复模型视图堆栈
             modelViewStack.popMatrix();
             RenderSystem.applyModelViewMatrix();
+        }
+
+        /**
+         * 生成 UV 球体网格。
+         * <p>
+         * 球心在原点，顶点坐标即为法线方向乘以半径。
+         * 三角形缠绕方向为 CCW（从外部观察），
+         * 配合 gl_FrontFacing 可区分内外表面。
+         *
+         * @param builder  顶点缓冲构建器
+         * @param radius   球体半径
+         * @param segments 经线分段数（沿赤道方向）
+         * @param rings    纬线分段数（从北极到南极）
+         */
+        private static void buildSphere(BufferBuilder builder, float radius,
+                                        int segments, int rings) {
+            for (int i = 0; i < rings; i++) {
+                double theta1 = Math.PI * i / rings;
+                double theta2 = Math.PI * (i + 1) / rings;
+
+                float sinT1 = (float) Math.sin(theta1), cosT1 = (float) Math.cos(theta1);
+                float sinT2 = (float) Math.sin(theta2), cosT2 = (float) Math.cos(theta2);
+
+                for (int j = 0; j < segments; j++) {
+                    double phi1 = 2.0 * Math.PI * j / segments;
+                    double phi2 = 2.0 * Math.PI * (j + 1) / segments;
+
+                    float sinP1 = (float) Math.sin(phi1), cosP1 = (float) Math.cos(phi1);
+                    float sinP2 = (float) Math.sin(phi2), cosP2 = (float) Math.cos(phi2);
+
+                    // 单位球面上的四个顶点（同时也是法线方向）
+                    float x1 = sinT1 * cosP1, y1 = cosT1, z1 = sinT1 * sinP1;
+                    float x2 = sinT1 * cosP2, y2 = cosT1, z2 = sinT1 * sinP2;
+                    float x3 = sinT2 * cosP2, y3 = cosT2, z3 = sinT2 * sinP2;
+                    float x4 = sinT2 * cosP1, y4 = cosT2, z4 = sinT2 * sinP1;
+
+                    // 三角形 1: v1 -> v2 -> v3 (CCW from outside)
+                    builder.addVertex(x1 * radius, y1 * radius, z1 * radius);
+                    builder.addVertex(x2 * radius, y2 * radius, z2 * radius);
+                    builder.addVertex(x3 * radius, y3 * radius, z3 * radius);
+
+                    // 三角形 2: v1 -> v3 -> v4
+                    builder.addVertex(x1 * radius, y1 * radius, z1 * radius);
+                    builder.addVertex(x3 * radius, y3 * radius, z3 * radius);
+                    builder.addVertex(x4 * radius, y4 * radius, z4 * radius);
+                }
+            }
         }
 
         @SubscribeEvent
