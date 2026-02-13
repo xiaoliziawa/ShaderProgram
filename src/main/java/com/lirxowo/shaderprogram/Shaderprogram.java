@@ -2,16 +2,9 @@ package com.lirxowo.shaderprogram;
 
 import com.lirxowo.shaderprogram.entity.ModEntities;
 import com.lirxowo.shaderprogram.item.ModItems;
-import com.lirxowo.shaderprogram.network.EnchantedBlockSyncPacket;
-import com.lirxowo.shaderprogram.network.EnchantedBlockUpdatePacket;
-import com.lirxowo.shaderprogram.network.TimeStopPacket;
 import com.lirxowo.shaderprogram.sound.ModSounds;
 import net.neoforged.bus.api.IEventBus;
-import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.common.Mod;
-import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
-import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -25,28 +18,5 @@ public class Shaderprogram {
         ModSounds.SOUND_EVENTS.register(modBus);
         ModItems.ITEMS.register(modBus);
         ModItems.CREATIVE_TABS.register(modBus);
-    }
-
-    @EventBusSubscriber(modid = MODID, bus = EventBusSubscriber.Bus.MOD)
-    public static class ModEvents {
-        @SubscribeEvent
-        public static void onRegisterPayloads(RegisterPayloadHandlersEvent event) {
-            PayloadRegistrar registrar = event.registrar("1");
-            registrar.playToServer(
-                    TimeStopPacket.TYPE,
-                    TimeStopPacket.STREAM_CODEC,
-                    TimeStopPacket::handle
-            );
-            registrar.playToClient(
-                    EnchantedBlockSyncPacket.TYPE,
-                    EnchantedBlockSyncPacket.STREAM_CODEC,
-                    EnchantedBlockSyncPacket::handle
-            );
-            registrar.playToClient(
-                    EnchantedBlockUpdatePacket.TYPE,
-                    EnchantedBlockUpdatePacket.STREAM_CODEC,
-                    EnchantedBlockUpdatePacket::handle
-            );
-        }
     }
 }
