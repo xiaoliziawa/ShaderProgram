@@ -19,4 +19,22 @@ public class ModEntities {
                             .clientTrackingRange(10)
                             .build("glass_sphere")
             );
+
+    public static final Supplier<EntityType<BlackHoleEntity>> BLACK_HOLE =
+            ENTITY_TYPES.register("black_hole", () ->
+                    EntityType.Builder.of(BlackHoleEntity::new, MobCategory.MISC)
+                            .sized(0.5f, 0.5f)
+                            .clientTrackingRange(16)
+                            .updateInterval(1)
+                            .build("black_hole")
+            );
+
+    public static final Supplier<EntityType<SunEntity>> SUN =
+            ENTITY_TYPES.register("sun", () ->
+                    EntityType.Builder.of(SunEntity::new, MobCategory.MISC)
+                            .sized(0.5f, 0.5f)
+                            .clientTrackingRange(16)
+                            .updateInterval(1)
+                            .build("sun")
+            );
 }

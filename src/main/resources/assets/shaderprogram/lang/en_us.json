@@ -4,5 +4,7 @@
   "key.shaderprogram.toggle_time_stop": "Toggle Time Stop",
   "key.shaderprogram.toggle_dissolve": "Toggle Dissolve",
   "key.shaderprogram.cycle_tile": "Cycle Tile",
-  "key.categories.shaderprogram": "ShaderProgram"
+  "key.categories.shaderprogram": "ShaderProgram",
+  "entity.shaderprogram.black_hole": "Black Hole",
+  "entity.shaderprogram.sun": "Sun"
 }

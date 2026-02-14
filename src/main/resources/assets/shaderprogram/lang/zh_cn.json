@@ -4,5 +4,7 @@
   "key.shaderprogram.toggle_time_stop": "切换时停效果",
   "key.shaderprogram.toggle_dissolve": "切换溶解效果",
   "key.shaderprogram.cycle_tile": "切换瓷砖效果",
-  "key.categories.shaderprogram": "ShaderProgram"
+  "key.categories.shaderprogram": "ShaderProgram",
+  "entity.shaderprogram.black_hole": "\u9ed1\u6d1e",
+  "entity.shaderprogram.sun": "\u592a\u9633"
 }

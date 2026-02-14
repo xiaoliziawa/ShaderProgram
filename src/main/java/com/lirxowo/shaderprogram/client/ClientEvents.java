@@ -1,8 +1,10 @@
 package com.lirxowo.shaderprogram.client;
 
 import com.lirxowo.shaderprogram.Shaderprogram;
+import com.lirxowo.shaderprogram.entity.BlackHoleEntity;
 import com.lirxowo.shaderprogram.entity.GlassSphereEntity;
 import com.lirxowo.shaderprogram.entity.ModEntities;
+import com.lirxowo.shaderprogram.entity.SunEntity;
 import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.*;
@@ -50,6 +52,13 @@ public class ClientEvents {
             "key.categories.shaderprogram"
     );
 
+    private static final KeyMapping PIXELATE_KEY = new KeyMapping(
+            "key.shaderprogram.toggle_pixelate",
+            InputConstants.Type.KEYSYM,
+            GLFW.GLFW_KEY_P,
+            "key.categories.shaderprogram"
+    );
+
     @EventBusSubscriber(modid = Shaderprogram.MODID, value = Dist.CLIENT)
     public static class ModBusEvents {
 
@@ -58,11 +67,14 @@ public class ClientEvents {
             event.register(DISSOLVE_KEY);
             event.register(TILE_KEY);
             event.register(TIME_STOP_KEY);
+            event.register(PIXELATE_KEY);
         }
 
         @SubscribeEvent
         public static void onRegisterRenderers(EntityRenderersEvent.RegisterRenderers event) {
             event.registerEntityRenderer(ModEntities.GLASS_SPHERE.get(), GlassSphereRenderer::new);
+            event.registerEntityRenderer(ModEntities.BLACK_HOLE.get(), BlackHoleRenderer::new);
+            event.registerEntityRenderer(ModEntities.SUN.get(), SunRenderer::new);
         }
 
         @SubscribeEvent
@@ -85,6 +97,18 @@ public class ClientEvents {
                             DefaultVertexFormat.POSITION),
                     instance -> SynthwaveSkyShader.instance = instance
             );
+            event.registerShader(
+                    new ShaderInstance(event.getResourceProvider(),
+                            "shaderprogram:black_hole",
+                            DefaultVertexFormat.POSITION),
+                    instance -> BlackHoleShader.instance = instance
+            );
+            event.registerShader(
+                    new ShaderInstance(event.getResourceProvider(),
+                            "shaderprogram:sun",
+                            DefaultVertexFormat.POSITION),
+                    instance -> SunShader.instance = instance
+            );
         }
     }
 
@@ -105,8 +129,12 @@ public class ClientEvents {
                     TimeStopEffect.toggle(mc.player);
                 }
             }
+            while (PIXELATE_KEY.consumeClick()) {
+                PixelateEffect.toggle();
+            }
             SynthwaveEffect.tick();
             TimeStopEffect.tick();
+            PixelateEffect.tick();
         }
 
         @SubscribeEvent
@@ -115,10 +143,13 @@ public class ClientEvents {
                 SynthwaveEffect.applyUniforms();
                 TileEffect.applyUniforms();
                 TimeStopEffect.applyPostUniforms();
+                PixelateEffect.applyPostUniforms();
                 SynthwaveSkyRenderer.render(event);
             }
             if (event.getStage() == RenderLevelStageEvent.Stage.AFTER_WEATHER) {
                 renderGlassSpheres(event);
+                renderBlackHoles(event);
+                renderSuns(event);
                 EnchantGlintRenderer.render(event);
             }
         }
@@ -249,6 +280,167 @@ public class ClientEvents {
                     builder.addVertex(x4 * radius, y4 * radius, z4 * radius);
                 }
             }
+        }
+
+        private static void renderBlackHoles(RenderLevelStageEvent event) {
+            ShaderInstance shader = BlackHoleShader.instance;
+            if (shader == null) return;
+
+            Minecraft mc = Minecraft.getInstance();
+            if (mc.level == null) return;
+
+            Camera camera = event.getCamera();
+            Vec3 camPos = camera.getPosition();
+
+            AABB searchBox = AABB.ofSize(camPos, 256, 256, 256);
+            List<BlackHoleEntity> blackHoles = mc.level.getEntitiesOfClass(
+                    BlackHoleEntity.class, searchBox
+            );
+            if (blackHoles.isEmpty()) return;
+
+            BlackHoleShader.captureScene();
+            if (BlackHoleShader.getCaptureTexId() == -1) return;
+
+            float screenWidth = mc.getWindow().getWidth();
+            float screenHeight = mc.getWindow().getHeight();
+
+            // viewMatrix: 世界空间 → 视空间（纯旋转）
+            Matrix4f viewMatrix = new Matrix4f().rotation(
+                    camera.rotation().conjugate(new Quaternionf())
+            );
+            Matrix4fStack modelViewStack = RenderSystem.getModelViewStack();
+            modelViewStack.pushMatrix();
+
+            float partialTick = event.getPartialTick().getGameTimeDeltaPartialTick(false);
+
+            for (BlackHoleEntity entity : blackHoles) {
+                // partialTick 插值：消除 20 TPS tick 与 60+ FPS 渲染之间的跳帧
+                double ex = entity.xOld + (entity.getX() - entity.xOld) * partialTick;
+                double ey = entity.yOld + (entity.getY() - entity.yOld) * partialTick;
+                double ez = entity.zOld + (entity.getZ() - entity.zOld) * partialTick;
+
+                float dx = (float) (ex - camPos.x);
+                float dy = (float) (ey - camPos.y);
+                float dz = (float) (ez - camPos.z);
+
+                // 将实体位置变换到视空间
+                float vx = viewMatrix.m00() * dx + viewMatrix.m10() * dy + viewMatrix.m20() * dz;
+                float vy = viewMatrix.m01() * dx + viewMatrix.m11() * dy + viewMatrix.m21() * dz;
+                float vz = viewMatrix.m02() * dx + viewMatrix.m12() * dy + viewMatrix.m22() * dz;
+
+                // ModelViewMat = 纯平移（无旋转）→ billboard 永远面向相机
+                modelViewStack.identity();
+                modelViewStack.translate(vx, vy, vz);
+                RenderSystem.applyModelViewMatrix();
+
+                float radius = 3.0f;
+
+                BufferBuilder builder = Tesselator.getInstance().begin(
+                        VertexFormat.Mode.TRIANGLES, DefaultVertexFormat.POSITION);
+
+                // Billboard 四边形（视空间 XY 平面）
+                builder.addVertex(-radius, -radius, 0);
+                builder.addVertex( radius, -radius, 0);
+                builder.addVertex( radius,  radius, 0);
+                builder.addVertex(-radius, -radius, 0);
+                builder.addVertex( radius,  radius, 0);
+                builder.addVertex(-radius,  radius, 0);
+
+                RenderSystem.depthMask(false);
+                RenderSystem.enableDepthTest();
+                RenderSystem.enableBlend();
+                RenderSystem.defaultBlendFunc();
+                RenderSystem.disableCull();
+
+                RenderSystem.setShader(() -> shader);
+                RenderSystem.setShaderTexture(0, BlackHoleShader.getCaptureTexId());
+
+                var screenSizeUniform = shader.getUniform("ScreenSize");
+                if (screenSizeUniform != null) {
+                    screenSizeUniform.set(screenWidth, screenHeight);
+                }
+
+                BufferUploader.drawWithShader(builder.buildOrThrow());
+            }
+
+            RenderSystem.depthMask(true);
+            RenderSystem.disableBlend();
+            RenderSystem.enableCull();
+
+            modelViewStack.popMatrix();
+            RenderSystem.applyModelViewMatrix();
+        }
+
+        private static void renderSuns(RenderLevelStageEvent event) {
+            ShaderInstance shader = SunShader.instance;
+            if (shader == null) return;
+
+            Minecraft mc = Minecraft.getInstance();
+            if (mc.level == null) return;
+
+            Camera camera = event.getCamera();
+            Vec3 camPos = camera.getPosition();
+
+            AABB searchBox = AABB.ofSize(camPos, 128, 128, 128);
+            List<SunEntity> suns = mc.level.getEntitiesOfClass(
+                    SunEntity.class, searchBox
+            );
+            if (suns.isEmpty()) return;
+
+            Matrix4f viewMatrix = new Matrix4f().rotation(
+                    camera.rotation().conjugate(new Quaternionf())
+            );
+            Matrix4fStack modelViewStack = RenderSystem.getModelViewStack();
+            modelViewStack.pushMatrix();
+
+            float partialTick = event.getPartialTick().getGameTimeDeltaPartialTick(false);
+
+            for (SunEntity entity : suns) {
+                double ex = entity.xOld + (entity.getX() - entity.xOld) * partialTick;
+                double ey = entity.yOld + (entity.getY() - entity.yOld) * partialTick;
+                double ez = entity.zOld + (entity.getZ() - entity.zOld) * partialTick;
+
+                float dx = (float) (ex - camPos.x);
+                float dy = (float) (ey - camPos.y);
+                float dz = (float) (ez - camPos.z);
+
+                float vx = viewMatrix.m00() * dx + viewMatrix.m10() * dy + viewMatrix.m20() * dz;
+                float vy = viewMatrix.m01() * dx + viewMatrix.m11() * dy + viewMatrix.m21() * dz;
+                float vz = viewMatrix.m02() * dx + viewMatrix.m12() * dy + viewMatrix.m22() * dz;
+
+                modelViewStack.identity();
+                modelViewStack.translate(vx, vy, vz);
+                RenderSystem.applyModelViewMatrix();
+
+                float radius = 3.0f;
+
+                BufferBuilder builder = Tesselator.getInstance().begin(
+                        VertexFormat.Mode.TRIANGLES, DefaultVertexFormat.POSITION);
+
+                builder.addVertex(-radius, -radius, 0);
+                builder.addVertex( radius, -radius, 0);
+                builder.addVertex( radius,  radius, 0);
+                builder.addVertex(-radius, -radius, 0);
+                builder.addVertex( radius,  radius, 0);
+                builder.addVertex(-radius,  radius, 0);
+
+                RenderSystem.depthMask(false);
+                RenderSystem.enableDepthTest();
+                RenderSystem.enableBlend();
+                RenderSystem.defaultBlendFunc();
+                RenderSystem.disableCull();
+
+                RenderSystem.setShader(() -> shader);
+
+                BufferUploader.drawWithShader(builder.buildOrThrow());
+            }
+
+            RenderSystem.depthMask(true);
+            RenderSystem.disableBlend();
+            RenderSystem.enableCull();
+
+            modelViewStack.popMatrix();
+            RenderSystem.applyModelViewMatrix();
         }
 
         @SubscribeEvent

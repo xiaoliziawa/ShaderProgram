@@ -1,0 +1,21 @@
+{
+  "targets": ["swap"],
+  "passes": [
+    {
+      "name": "shaderprogram:sp_pixelate",
+      "intarget": "minecraft:main",
+      "outtarget": "swap",
+      "uniforms": [
+        {
+          "name": "PixelSize",
+          "values": [8.0]
+        }
+      ]
+    },
+    {
+      "name": "shaderprogram:sp_blit",
+      "intarget": "swap",
+      "outtarget": "minecraft:main"
+    }
+  ]
+}
