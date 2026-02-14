@@ -148,8 +148,8 @@ public class ClientEvents {
             }
             if (event.getStage() == RenderLevelStageEvent.Stage.AFTER_WEATHER) {
                 renderGlassSpheres(event);
-                renderBlackHoles(event);
                 renderSuns(event);
+                renderBlackHoles(event);
                 EnchantGlintRenderer.render(event);
             }
         }
@@ -427,7 +427,7 @@ public class ClientEvents {
                 RenderSystem.depthMask(false);
                 RenderSystem.enableDepthTest();
                 RenderSystem.enableBlend();
-                RenderSystem.defaultBlendFunc();
+                RenderSystem.blendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE);
                 RenderSystem.disableCull();
 
                 RenderSystem.setShader(() -> shader);
@@ -437,6 +437,7 @@ public class ClientEvents {
 
             RenderSystem.depthMask(true);
             RenderSystem.disableBlend();
+            RenderSystem.defaultBlendFunc();
             RenderSystem.enableCull();
 
             modelViewStack.popMatrix();
