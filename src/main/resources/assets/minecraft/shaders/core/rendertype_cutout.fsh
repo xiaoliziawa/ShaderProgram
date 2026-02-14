@@ -9,8 +9,12 @@ uniform float FogStart;
 uniform float FogEnd;
 uniform vec4 FogColor;
 uniform float GameTime;
-uniform float DissolveProgress;
+uniform float SynthwaveRadius;
+uniform float WaveOriginX;
+uniform float WaveOriginZ;
 uniform float TileCount;
+uniform float CameraPosX;
+uniform float CameraPosZ;
 
 in float vertexDistance;
 in vec4 vertexColor;
@@ -19,47 +23,97 @@ in vec3 chunkPos;
 
 out vec4 fragColor;
 
-#define PHASE_POWER 2.0
+// ============================================================
+// Synthwave ground shader — faithful port of Shadertoy
+// "another synthwave sunset thing" (ground surface only)
+// ============================================================
 
-vec2 hash2(vec2 p) {
-    return fract(sin(vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)))) * 43758.5453);
+float jTime;
+
+float hash21(vec2 co) {
+    return fract(sin(dot(co.xy, vec2(1.9898, 7.233))) * 45758.5433);
 }
 
-vec4 voronoi(in vec2 x) {
-    vec2 n = floor(x);
-    vec2 f = fract(x);
-    vec2 o;
+float pow512(float a) {
+    a *= a; a *= a; a *= a; a *= a;
+    a *= a; a *= a; a *= a; a *= a;
+    return a * a;
+}
 
-    vec2 mg, mr;
-    float oldDist;
-    float md = 8.0;
+float pow1d5(float a) {
+    return a * sqrt(a);
+}
 
-    for (int j = -1; j <= 1; j++)
-    for (int i = -1; i <= 1; i++) {
-        vec2 g = vec2(float(i), float(j));
-        o = hash2(n + g);
-        vec2 r = g + o - f;
-        float d = dot(r, r);
-        if (d < md) {
-            md = d;
-            mr = r;
-            mg = g;
-        }
-    }
+float synthHash(vec2 uv) {
+    float w = 1.0 - 0.4 * pow512(0.51 + 0.49 * sin((0.02 * (uv.y + 0.5 * uv.x) - jTime) * 2.0));
+    return pow1d5(hash21(uv)) * w;
+}
 
-    oldDist = md;
+float edgeMin(float dx, vec2 da, vec2 db, vec2 uv) {
+    uv.x += 5.0;
+    vec3 c = fract(floor(vec3(uv, uv.x + uv.y) + 0.5) * (vec3(0.0, 1.0, 2.0) + 0.61803398875));
+    return min(min((1.0 - dx) * db.y, da.x), da.y);
+}
 
-    md = 8.0;
-    for (int j = -2; j <= 2; j++)
-    for (int i = -2; i <= 2; i++) {
-        vec2 g = mg + vec2(float(i), float(j));
-        o = hash2(n + g);
-        vec2 r = g + o - f;
-        if (dot(mr - r, mr - r) > 0.00001)
-            md = min(md, dot(0.5 * (mr + r), normalize(r - mr)));
-    }
+vec2 trinoise(vec2 uv) {
+    float sq = 1.2247448714;
+    uv.x *= sq;
+    uv.y -= 0.5 * uv.x;
+    vec2 d = fract(uv);
+    uv -= d;
 
-    return vec4(md, mr, oldDist);
+    bool c = dot(d, vec2(1.0)) > 1.0;
+
+    vec2 dd = 1.0 - d;
+    vec2 da = c ? dd : d;
+    vec2 db = c ? d : dd;
+
+    float nn = synthHash(uv + float(c));
+    float n2 = synthHash(uv + vec2(1.0, 0.0));
+    float n3 = synthHash(uv + vec2(0.0, 1.0));
+
+    float nmid = mix(n2, n3, d.y);
+    float ns = mix(nn, c ? n2 : n3, da.y);
+    float dx = da.x / db.y;
+    return vec2(mix(ns, nmid, dx), edgeMin(dx, da, db, uv + d));
+}
+
+vec3 trinoiseGrad(vec2 uv) {
+    const float e = 0.05;
+    float h  = trinoise(uv).x;
+    float hx = trinoise(uv + vec2(e, 0.0)).x;
+    float hz = trinoise(uv + vec2(0.0, e)).x;
+    return normalize(vec3(h - hx, 0.5, h - hz));
+}
+
+vec3 skyColor(vec3 rd, vec3 ld) {
+    float haze = exp2(-5.0 * (abs(rd.y) - 0.2 * dot(rd, ld)));
+    vec3 back = vec3(0.4, 0.1, 0.7);
+    return clamp(mix(back, vec3(0.7, 0.1, 0.4), haze), 0.0, 1.0);
+}
+
+vec3 synthwaveGround(vec2 worldXZ, vec3 fragPos) {
+    vec2 uv = worldXZ * 0.15;
+    uv.y += jTime * 0.8;
+
+    vec2 n = trinoise(uv);
+    vec3 norm = trinoiseGrad(uv);
+
+    vec3 ld = normalize(vec3(0.0, 0.125 + 0.05 * sin(jTime * 0.1), 1.0));
+
+    float diff = dot(norm, ld) + 0.1 * norm.y;
+    vec3 col = vec3(0.1, 0.11, 0.18) * diff;
+
+    vec3 rd = normalize(fragPos);
+    vec3 rfd = reflect(rd, norm);
+    vec3 rfcol = skyColor(rfd, ld);
+
+    float fresnel = 0.05 + 0.95 * pow(max(1.0 + dot(rd, norm), 0.0), 5.0);
+    col = mix(col, rfcol, fresnel);
+
+    col = mix(col, vec3(0.8, 0.1, 0.92), smoothstep(0.05, 0.0, n.y));
+
+    return col;
 }
 
 vec2 tileUV(vec2 uv, float count) {
@@ -82,44 +136,25 @@ void main() {
         discard;
     }
 
-    if (DissolveProgress > 0.001) {
-        vec2 p = chunkPos.xz + chunkPos.y * 0.37;
-        p *= 0.8;
+    if (SynthwaveRadius > 0.01) {
+        float distFromOrigin = length(chunkPos.xz - vec2(WaveOriginX, WaveOriginZ));
 
-        float timeStep = DissolveProgress * 2.0 - 0.5;
+        float transitionWidth = 5.0;
+        float coverage = 1.0 - smoothstep(max(SynthwaveRadius - transitionWidth, 0.0), SynthwaveRadius, distFromOrigin);
 
-        float t = GameTime * 200.0;
-        p += vec2(t * 0.02, t * 0.01);
+        if (coverage > 0.001) {
+            jTime = GameTime * 1200.0;
 
-        vec4 c = voronoi(p);
-        c.x = 1.0 - pow(1.0 - c.x, 2.0);
+            // Restore world-absolute coords for noise sampling (chunkPos is camera-relative)
+            vec2 worldXZ = chunkPos.xz + vec2(CameraPosX, CameraPosZ);
+            vec2 synthUV = worldXZ + chunkPos.y * 0.37;
+            vec3 synthCol = synthwaveGround(synthUV, chunkPos);
 
-        float cellPhase = p.x + c.y + 2.0 * sin((p.y + c.z) * 0.8 + (p.x + c.y) * 0.4);
-        cellPhase *= 0.025;
-        cellPhase = clamp(abs(mod(cellPhase - timeStep, 1.0) - 0.5) * 2.0, 0.0, 1.0);
-        cellPhase = pow(clamp(cellPhase * 2.0 - 0.5, 0.0, 1.0), PHASE_POWER);
+            float borderLine = 1.0 - smoothstep(0.0, 2.5, abs(distFromOrigin - SynthwaveRadius + 1.5));
+            synthCol += vec3(0.8, 0.1, 0.92) * borderLine * 0.6;
 
-        float edgePhase = p.x + 2.0 * sin(p.y * 0.8 + p.x * 0.4);
-        edgePhase *= 0.025;
-        edgePhase = clamp(abs(mod(edgePhase - timeStep, 1.0) - 0.5) * 2.0, 0.0, 1.0);
-        edgePhase = pow(clamp(edgePhase * 2.0 - 0.5, 0.0, 1.0), PHASE_POWER);
-
-        float phase = mix(edgePhase, cellPhase, smoothstep(0.0, 0.2, edgePhase));
-
-        if (phase > 0.95) discard;
-
-        float shapedPhase = 1.0 - pow(1.0 - phase, 2.0);
-        vec3 voronoiCol = mix(
-            vec3(0.0, 0.6, 1.0),
-            vec3(1.0, 1.0, 1.0),
-            smoothstep(
-                shapedPhase - mix(0.025, 0.001, shapedPhase),
-                shapedPhase,
-                mix(c.x, 0.999 - c.w, shapedPhase)
-            )
-        );
-
-        color.rgb = mix(color.rgb, voronoiCol, smoothstep(0.0, 0.3, phase));
+            color.rgb = mix(color.rgb, synthCol, coverage);
+        }
     }
 
     fragColor = linear_fog(color, vertexDistance, FogStart, FogEnd, FogColor);

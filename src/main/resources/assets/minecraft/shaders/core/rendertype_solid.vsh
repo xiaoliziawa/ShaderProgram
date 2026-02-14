@@ -15,8 +15,6 @@ uniform mat4 ModelViewMat;
 uniform mat4 ProjMat;
 uniform vec3 ChunkOffset;
 uniform int FogShape;
-uniform float GameTime;
-uniform float DissolveProgress;
 
 out float vertexDistance;
 out vec4 vertexColor;
@@ -25,22 +23,7 @@ out vec3 chunkPos;
 
 void main() {
     vec3 pos = Position + ChunkOffset;
-    chunkPos = Position + ChunkOffset;
-
-    if (DissolveProgress > 0.001) {
-        float h = fract(sin(dot(Position, vec3(12.9898, 78.233, 45.164))) * 43758.5453);
-        float disp = DissolveProgress * DissolveProgress * 3.0;
-        float t = GameTime * 2000.0;
-
-        // 仅使用基于Position的位移（不使用Normal），以确保共享边
-        // 的顶点始终以相同方式移动 -- 面之间不会出现接缝。
-        vec3 offset = vec3(0.0);
-        offset.y += disp * (0.5 + h * 0.5);
-        offset.x += sin(h * 6.283 + t) * disp * 0.3;
-        offset.z += cos(h * 5.0 + t * 1.3) * disp * 0.3;
-
-        pos += offset;
-    }
+    chunkPos = pos;
 
     gl_Position = ProjMat * ModelViewMat * vec4(pos, 1.0);
 

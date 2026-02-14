@@ -79,6 +79,12 @@ public class ClientEvents {
                             DefaultVertexFormat.POSITION_TEX),
                     instance -> EnchantGlintShader.instance = instance
             );
+            event.registerShader(
+                    new ShaderInstance(event.getResourceProvider(),
+                            "shaderprogram:synthwave_sky",
+                            DefaultVertexFormat.POSITION),
+                    instance -> SynthwaveSkyShader.instance = instance
+            );
         }
     }
 
@@ -88,7 +94,7 @@ public class ClientEvents {
         @SubscribeEvent
         public static void onClientTick(ClientTickEvent.Post event) {
             while (DISSOLVE_KEY.consumeClick()) {
-                DissolveEffect.toggle();
+                SynthwaveEffect.toggle();
             }
             while (TILE_KEY.consumeClick()) {
                 TileEffect.cycle();
@@ -99,16 +105,17 @@ public class ClientEvents {
                     TimeStopEffect.toggle(mc.player);
                 }
             }
-            DissolveEffect.tick();
+            SynthwaveEffect.tick();
             TimeStopEffect.tick();
         }
 
         @SubscribeEvent
         public static void onRenderLevel(RenderLevelStageEvent event) {
             if (event.getStage() == RenderLevelStageEvent.Stage.AFTER_SKY) {
-                DissolveEffect.applyUniforms();
+                SynthwaveEffect.applyUniforms();
                 TileEffect.applyUniforms();
                 TimeStopEffect.applyPostUniforms();
+                SynthwaveSkyRenderer.render(event);
             }
             if (event.getStage() == RenderLevelStageEvent.Stage.AFTER_WEATHER) {
                 renderGlassSpheres(event);
@@ -177,7 +184,6 @@ public class ClientEvents {
                     GL11.glCullFace(GL11.GL_FRONT);
                 }
                 // 相机在球外：默认剔除背面，只渲染外壁（正面）
-
                 RenderSystem.setShader(() -> shader);
                 RenderSystem.setShaderTexture(0, GlassSphereShader.getCaptureTexId());
 
@@ -255,7 +261,7 @@ public class ClientEvents {
                 }
 
                 float progress = Math.min(1.0f, (entity.deathTime + event.getPartialTick()) / 20.0f);
-                DissolveEffect.setEntityDissolveProgress(progress);
+                SynthwaveEffect.setEntityDissolveProgress(progress);
             }
         }
 
@@ -268,7 +274,7 @@ public class ClientEvents {
                     bufferSource.endBatch();
                 }
 
-                DissolveEffect.setEntityDissolveProgress(0.0f);
+                SynthwaveEffect.setEntityDissolveProgress(0.0f);
             }
         }
     }
