@@ -20,6 +20,7 @@
         { "name": "WaveOriginZ", "type": "float", "count": 1, "values": [ 0.0 ] },
         { "name": "TileCount", "type": "float", "count": 1, "values": [ 1.0 ] },
         { "name": "CameraPosX", "type": "float", "count": 1, "values": [ 0.0 ] },
-        { "name": "CameraPosZ", "type": "float", "count": 1, "values": [ 0.0 ] }
+        { "name": "CameraPosZ", "type": "float", "count": 1, "values": [ 0.0 ] },
+        { "name": "SeascapeEnabled", "type": "float", "count": 1, "values": [ 0.0 ] }
     ]
 }

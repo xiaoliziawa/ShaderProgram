@@ -59,6 +59,13 @@ public class ClientEvents {
             "key.categories.shaderprogram"
     );
 
+    private static final KeyMapping SEASCAPE_KEY = new KeyMapping(
+            "key.shaderprogram.toggle_seascape",
+            InputConstants.Type.KEYSYM,
+            GLFW.GLFW_KEY_N,
+            "key.categories.shaderprogram"
+    );
+
     @EventBusSubscriber(modid = Shaderprogram.MODID, value = Dist.CLIENT)
     public static class ModBusEvents {
 
@@ -68,6 +75,7 @@ public class ClientEvents {
             event.register(TILE_KEY);
             event.register(TIME_STOP_KEY);
             event.register(PIXELATE_KEY);
+            event.register(SEASCAPE_KEY);
         }
 
         @SubscribeEvent
@@ -132,6 +140,9 @@ public class ClientEvents {
             while (PIXELATE_KEY.consumeClick()) {
                 PixelateEffect.toggle();
             }
+            while (SEASCAPE_KEY.consumeClick()) {
+                SeascapeEffect.toggle();
+            }
             SynthwaveEffect.tick();
             TimeStopEffect.tick();
             PixelateEffect.tick();
@@ -142,6 +153,7 @@ public class ClientEvents {
             if (event.getStage() == RenderLevelStageEvent.Stage.AFTER_SKY) {
                 SynthwaveEffect.applyUniforms();
                 TileEffect.applyUniforms();
+                SeascapeEffect.applyUniforms();
                 TimeStopEffect.applyPostUniforms();
                 PixelateEffect.applyPostUniforms();
                 SynthwaveSkyRenderer.render(event);

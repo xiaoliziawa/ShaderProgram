@@ -15,11 +15,13 @@ uniform float WaveOriginZ;
 uniform float TileCount;
 uniform float CameraPosX;
 uniform float CameraPosZ;
+uniform float SeascapeEnabled;
 
 in float vertexDistance;
 in vec4 vertexColor;
 in vec2 texCoord0;
 in vec3 chunkPos;
+in vec3 worldPos;
 
 out vec4 fragColor;
 
@@ -126,6 +128,97 @@ vec2 tileUV(vec2 uv, float count) {
     return spriteOrigin + halfTexel + tiledUV * (spriteUVSize - 2.0 * halfTexel);
 }
 
+// ============================================================
+// Seascape water — BSL-style dual-scale noise normals
+// with Fresnel reflection, specular, and parallax
+// ============================================================
+
+const float WATER_SPEED = 1.0;
+const float WATER_BUMP = 1.0;
+const float WATER_DETAIL = 0.25;
+const float WATER_SHARPNESS = 0.2;
+
+// Procedural noise (no texture needed)
+float seaHash(vec2 p) {
+    float h = dot(p, vec2(127.1, 311.7));
+    return fract(sin(h) * 43758.5453123);
+}
+
+float seaNoiseSample(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    vec2 u = f * f * (3.0 - 2.0 * f);
+    return mix(
+        mix(seaHash(i), seaHash(i + vec2(1.0, 0.0)), u.x),
+        mix(seaHash(i + vec2(0.0, 1.0)), seaHash(i + vec2(1.0, 1.0)), u.x),
+        u.y);
+}
+
+// BSL-style multi-octave noise for height map (like noisetex sampling)
+float seaNoiseOctaves(vec2 p) {
+    float n = 0.0;
+    float amp = 0.5;
+    for (int i = 0; i < 5; i++) {
+        n += seaNoiseSample(p) * amp;
+        p = p * 2.03 + vec2(0.5);
+        amp *= 0.5;
+    }
+    return n;
+}
+
+// BSL-style dual-scale height map
+// Large waves (scale 256) + small detail (scale 48), animated in opposite directions
+float getWaterHeightMap(vec3 waterPos, vec2 offset, float time) {
+    vec2 wind = vec2(time) * 0.5 * WATER_SPEED;
+
+    waterPos.xz += waterPos.y * 0.2;
+
+    // Layer A: large waves
+    float noiseA = seaNoiseOctaves((waterPos.xz - wind) / 16.0 + offset / 16.0);
+    // Layer B: small detail
+    float noiseB = seaNoiseOctaves((waterPos.xz + wind) / 3.0 + offset / 3.0);
+
+    return mix(noiseA, noiseB, WATER_DETAIL) * WATER_BUMP;
+}
+
+// BSL-style finite-difference normal with Fresnel-aware strength
+vec3 getWaterNormal(vec3 waterPos, vec3 viewPos, float time) {
+    float normalOffset = WATER_SHARPNESS;
+
+    // Fresnel: reduce normal strength at grazing angles (more reflective = flatter)
+    vec3 viewDir = normalize(viewPos);
+    float fresnel = pow(clamp(1.0 + viewDir.y, 0.0, 1.0), 8.0);
+    float normalStrength = 0.35 * (1.0 - fresnel);
+
+    // Sample height at 4 adjacent points
+    float h1 = getWaterHeightMap(waterPos, vec2( normalOffset, 0.0), time);
+    float h2 = getWaterHeightMap(waterPos, vec2(-normalOffset, 0.0), time);
+    float h3 = getWaterHeightMap(waterPos, vec2(0.0,  normalOffset), time);
+    float h4 = getWaterHeightMap(waterPos, vec2(0.0, -normalOffset), time);
+
+    float xDelta = (h2 - h1) / normalOffset;
+    float yDelta = (h4 - h3) / normalOffset;
+
+    vec3 normalMap = vec3(xDelta, yDelta, 1.0 - (xDelta * xDelta + yDelta * yDelta));
+    return normalize(normalMap * normalStrength + vec3(0.0, 0.0, 1.0 - normalStrength));
+}
+
+// BSL-style parallax wave refinement (4 iterations)
+vec3 getParallaxWaves(vec3 waterPos, vec3 viewVector, float time) {
+    vec3 pPos = waterPos;
+    for (int i = 0; i < 4; i++) {
+        float height = -1.25 * getWaterHeightMap(pPos, vec2(0.0), time) + 0.25;
+        pPos.xz += height * viewVector.xz * 0.2;
+    }
+    return pPos;
+}
+
+// Sky color for Fresnel reflection
+vec3 waterSkyColor(vec3 e) {
+    e.y = (max(e.y, 0.0) * 0.8 + 0.2) * 0.8;
+    return vec3(pow(1.0 - e.y, 2.0), 1.0 - e.y, 0.6 + (1.0 - e.y) * 0.4) * 1.1;
+}
+
 void main() {
     vec2 uv = texCoord0;
     if (TileCount > 1.5) {
@@ -152,6 +245,38 @@ void main() {
 
             color.rgb = mix(color.rgb, synthCol, coverage);
         }
+    }
+
+    if (SeascapeEnabled > 0.5) {
+        float time = GameTime * 1200.0;
+        vec3 viewDir = normalize(chunkPos);
+        vec3 lightDir = normalize(vec3(0.0, 1.0, 0.8));
+
+        // BSL-style parallax wave refinement
+        vec3 waterPos = getParallaxWaves(worldPos, viewDir, time);
+
+        // BSL-style normal with Fresnel-aware strength
+        vec3 waterNorm = getWaterNormal(waterPos, chunkPos, time);
+        // Convert tangent-space normal (XY = tangent, Z = up) to world-space (XZY)
+        vec3 n = normalize(vec3(waterNorm.x, waterNorm.z, waterNorm.y));
+
+        // Fresnel reflection
+        float fresnel = pow(clamp(1.0 - dot(n, -viewDir), 0.0, 1.0), 5.0);
+        fresnel = fresnel * 0.65 + 0.02;
+
+        vec3 reflected = waterSkyColor(reflect(viewDir, n));
+        vec3 waterBase = vec3(0.0, 0.09, 0.18);
+        vec3 waterTint = vec3(0.8, 0.9, 0.6) * 0.6;
+        vec3 refracted = waterBase + waterTint * 0.12 * pow(dot(n, lightDir) * 0.4 + 0.6, 80.0);
+
+        vec3 seaCol = mix(refracted, reflected, fresnel);
+
+        // Specular highlight
+        float spec = pow(max(dot(reflect(viewDir, n), lightDir), 0.0), 60.0);
+        spec *= (60.0 + 8.0) / (3.1415926 * 8.0);
+        seaCol += vec3(spec);
+
+        color.rgb = seaCol;
     }
 
     fragColor = linear_fog(color, vertexDistance, FogStart, FogEnd, FogColor);
