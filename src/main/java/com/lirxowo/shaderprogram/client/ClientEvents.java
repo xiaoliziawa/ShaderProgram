@@ -117,6 +117,12 @@ public class ClientEvents {
                             DefaultVertexFormat.POSITION),
                     instance -> SunShader.instance = instance
             );
+            event.registerShader(
+                    new ShaderInstance(event.getResourceProvider(),
+                            "shaderprogram:cosmic_tooltip",
+                            DefaultVertexFormat.POSITION),
+                    CosmicTooltipShader::onShaderLoaded
+            );
         }
     }
 
@@ -146,6 +152,7 @@ public class ClientEvents {
             SynthwaveEffect.tick();
             TimeStopEffect.tick();
             PixelateEffect.tick();
+            CosmicTooltipShader.tick();
         }
 
         @SubscribeEvent
