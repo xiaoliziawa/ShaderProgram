@@ -62,6 +62,13 @@ public class CosmicTooltipRenderer {
         // Draw cosmic background
         renderCosmicBackground(graphics, x, y, tooltipWidth, tooltipHeight, shader);
 
+        // Dark overlay so text is readable
+        int bgX = x - PADDING;
+        int bgY = y - PADDING;
+        int bgW = tooltipWidth + PADDING * 2;
+        int bgH = tooltipHeight + PADDING * 2;
+        graphics.fill(bgX, bgY, bgX + bgW, bgY + bgH, Z_LEVEL, 0xA0000000);
+
         // Draw border (vanilla style)
         renderBorder(graphics, x, y, tooltipWidth, tooltipHeight);
 
