@@ -66,6 +66,13 @@ public class ClientEvents {
             "key.categories.shaderprogram"
     );
 
+    private static final KeyMapping WARP_KEY = new KeyMapping(
+            "key.shaderprogram.toggle_warp",
+            InputConstants.Type.KEYSYM,
+            GLFW.GLFW_KEY_K,
+            "key.categories.shaderprogram"
+    );
+
     @EventBusSubscriber(modid = Shaderprogram.MODID, value = Dist.CLIENT)
     public static class ModBusEvents {
 
@@ -76,6 +83,7 @@ public class ClientEvents {
             event.register(TIME_STOP_KEY);
             event.register(PIXELATE_KEY);
             event.register(SEASCAPE_KEY);
+            event.register(WARP_KEY);
         }
 
         @SubscribeEvent
@@ -149,9 +157,13 @@ public class ClientEvents {
             while (SEASCAPE_KEY.consumeClick()) {
                 SeascapeEffect.toggle();
             }
+            while (WARP_KEY.consumeClick()) {
+                WarpEffect.toggle();
+            }
             SynthwaveEffect.tick();
             TimeStopEffect.tick();
             PixelateEffect.tick();
+            WarpEffect.tick();
             CosmicTooltipShader.tick();
         }
 
@@ -163,6 +175,7 @@ public class ClientEvents {
                 SeascapeEffect.applyUniforms();
                 TimeStopEffect.applyPostUniforms();
                 PixelateEffect.applyPostUniforms();
+                WarpEffect.applyPostUniforms();
                 SynthwaveSkyRenderer.render(event);
             }
             if (event.getStage() == RenderLevelStageEvent.Stage.AFTER_WEATHER) {
