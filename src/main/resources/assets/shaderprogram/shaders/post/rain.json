@@ -1,0 +1,19 @@
+{
+  "targets": ["swap"],
+  "passes": [
+    {
+      "name": "shaderprogram:sp_rain",
+      "intarget": "minecraft:main",
+      "outtarget": "swap",
+      "uniforms": [
+        { "name": "RainTime", "values": [0.0] },
+        { "name": "RainIntensity", "values": [0.0] }
+      ]
+    },
+    {
+      "name": "shaderprogram:sp_blit",
+      "intarget": "swap",
+      "outtarget": "minecraft:main"
+    }
+  ]
+}

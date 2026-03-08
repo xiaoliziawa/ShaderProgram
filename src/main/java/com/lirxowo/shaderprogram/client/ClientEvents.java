@@ -164,6 +164,7 @@ public class ClientEvents {
             TimeStopEffect.tick();
             PixelateEffect.tick();
             WarpEffect.tick();
+            RainEffect.tick();
             CosmicTooltipShader.tick();
         }
 
@@ -176,6 +177,7 @@ public class ClientEvents {
                 TimeStopEffect.applyPostUniforms();
                 PixelateEffect.applyPostUniforms();
                 WarpEffect.applyPostUniforms();
+                RainEffect.applyPostUniforms();
                 SynthwaveSkyRenderer.render(event);
             }
             if (event.getStage() == RenderLevelStageEvent.Stage.AFTER_WEATHER) {
