@@ -13,8 +13,6 @@ uniform float RainIntensity;
 in vec2 texCoord;
 out vec4 fragColor;
 
-#define S(a, b, t) smoothstep(a, b, t)
-
 vec3 N13(float p) {
     vec3 p3 = fract(vec3(p) * vec3(.1031, .11369, .13787));
     p3 += dot(p3, p3.yzx + 19.19);
@@ -26,7 +24,7 @@ float N(float t) {
 }
 
 float Saw(float b, float t) {
-    return S(0., b, t) * S(1., b, t);
+    return smoothstep(0., b, t) * smoothstep(1., b, t);
 }
 
 vec2 DropLayer2(vec2 uv, float t) {
@@ -53,20 +51,20 @@ vec2 DropLayer2(vec2 uv, float t) {
     vec2 p = vec2(x, y);
 
     float d = length((st - p) * a.yx);
-    float mainDrop = S(.4, .0, d);
+    float mainDrop = smoothstep(.4, .0, d);
 
-    float r = sqrt(S(1., y, st.y));
+    float r = sqrt(smoothstep(1., y, st.y));
     float cd = abs(st.x - x);
-    float trail = S(.23 * r, .15 * r * r, cd);
-    float trailFront = S(-.02, .02, st.y - y);
+    float trail = smoothstep(.23 * r, .15 * r * r, cd);
+    float trailFront = smoothstep(-.02, .02, st.y - y);
     trail *= trailFront * r * r;
 
     y = UV.y;
-    float trail2 = S(.2 * r, .0, cd);
+    float trail2 = smoothstep(.2 * r, .0, cd);
     float droplets = max(0., (sin(y * (1. - y) * 120.) - st.y)) * trail2 * trailFront * n.z;
     y = fract(y * 10.) + (st.y - .5);
     float dd = length(st - vec2(x, y));
-    droplets = S(.3, 0., dd);
+    droplets = smoothstep(.3, 0., dd);
     float m = mainDrop + droplets * r * trailFront;
 
     return vec2(m, trail);
@@ -80,7 +78,7 @@ float StaticDrops(vec2 uv, float t) {
     vec2 p = (n.xy - .5) * .7;
     float d = length(uv - p);
     float fade = Saw(.025, fract(t + n.z));
-    float c = S(.3, 0., d) * fract(n.z * 10.) * fade;
+    float c = smoothstep(.3, 0., d) * fract(n.z * 10.) * fade;
     return c;
 }
 
@@ -90,7 +88,7 @@ vec2 Drops(vec2 uv, float t, float l0, float l1, float l2) {
     vec2 m2 = DropLayer2(uv * 1.85, t) * l2;
 
     float c = s + m1.x + m2.x;
-    c = S(.3, 1., c);
+    c = smoothstep(.3, 1., c);
 
     return vec2(c, max(m1.y * l0, m2.y * l1));
 }
@@ -135,9 +133,9 @@ void main() {
     float maxBlur = mix(3.0, 6.0, rainAmount);
     float minBlur = 2.0;
 
-    float staticDrops = S(-0.5, 1.0, rainAmount) * 2.0;
-    float layer1 = S(0.25, 0.75, rainAmount);
-    float layer2 = S(0.0, 0.5, rainAmount);
+    float staticDrops = smoothstep(-0.5, 1.0, rainAmount) * 2.0;
+    float layer1 = smoothstep(0.25, 0.75, rainAmount);
+    float layer2 = smoothstep(0.0, 0.5, rainAmount);
 
     vec2 c = Drops(rainUV, t, staticDrops, layer1, layer2);
 
@@ -147,7 +145,7 @@ void main() {
     float cy = Drops(rainUV + e.yx, t, staticDrops, layer1, layer2).x;
     vec2 n = vec2(cx - c.x, cy - c.x);
 
-    float focus = mix(maxBlur - c.y, minBlur, S(0.1, 0.2, c.x));
+    float focus = mix(maxBlur - c.y, minBlur, smoothstep(0.1, 0.2, c.x));
 
     // Radial lens curve: center is sharp, edges are blurry
     // Uses aspect-corrected distance so the clear zone is circular, not elliptical
