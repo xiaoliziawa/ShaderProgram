@@ -93,7 +93,6 @@ vec2 Drops(vec2 uv, float t, float l0, float l1, float l2) {
     return vec2(c, max(m1.y * l0, m2.y * l1));
 }
 
-// Approximate blur (textureLod is unavailable without mipmaps on the framebuffer)
 vec3 sampleBlurred(vec2 uv, float blur) {
     float r = blur * 2.0 / InSize.x;
 
@@ -112,19 +111,16 @@ vec3 sampleBlurred(vec2 uv, float blur) {
 
 void main() {
     vec2 tScale = InSize / OutSize;
-    vec2 UV = texCoord / tScale;            // normalized 0-1 screen coordinates
+    vec2 UV = texCoord / tScale;
 
-    // Original screen (no effect)
     vec3 original = texture(DiffuseSampler, texCoord).rgb;
 
-    // Early out when no rain — pass through original screen
     float rainAmount = RainIntensity;
     if (rainAmount < 0.001) {
         fragColor = vec4(original, 1.0);
         return;
     }
 
-    // Rain pattern coordinates (centered, aspect-corrected)
     vec2 rainUV = (UV - 0.5) * vec2(InSize.x / InSize.y, 1.0);
 
     float T = RainTime;
@@ -139,7 +135,6 @@ void main() {
 
     vec2 c = Drops(rainUV, t, staticDrops, layer1, layer2);
 
-    // Expensive normals (better quality than dFdx/dFdy)
     vec2 e = vec2(0.001, 0.0);
     float cx = Drops(rainUV + e, t, staticDrops, layer1, layer2).x;
     float cy = Drops(rainUV + e.yx, t, staticDrops, layer1, layer2).x;
@@ -147,33 +142,25 @@ void main() {
 
     float focus = mix(maxBlur - c.y, minBlur, smoothstep(0.1, 0.2, c.x));
 
-    // Radial lens curve: center is sharp, edges are blurry
-    // Uses aspect-corrected distance so the clear zone is circular, not elliptical
     float radial = length((UV - 0.5) * vec2(InSize.x / InSize.y, 1.0));
-    float lensFactor = radial * radial;  // quadratic falloff — gentle near center, accelerates towards edges
+    float lensFactor = radial * radial;
 
-    // Scale distortion and blur by rainAmount (fade in/out) and lens curve
     n *= rainAmount * lensFactor;
     focus *= rainAmount * lensFactor;
 
-    // Sample screen texture with raindrop distortion and blur
     vec3 col = sampleBlurred((UV + n) * tScale, focus);
 
-    // Post processing — subtle blue-ish color shift
     float lt = (T + 3.0) * 0.5;
     float colFade = sin(lt * 0.2) * 0.5 + 0.5;
     col *= mix(vec3(1.0), vec3(0.8, 0.9, 1.3), colFade);
 
-    // Lightning flash (occasional bright flicker)
     float lightning = sin(lt * sin(lt * 10.0));
     lightning *= pow(max(0.0, sin(lt + sin(lt))), 10.0);
     col *= 1.0 + lightning * 0.3;
 
-    // Subtle vignette
     vec2 vUV = UV - 0.5;
     col *= 1.0 - dot(vUV, vUV) * 0.4;
 
-    // Blend between original screen and rain effect for smooth fade in/out
     col = mix(original, col, rainAmount);
 
     fragColor = vec4(col, 1.0);
