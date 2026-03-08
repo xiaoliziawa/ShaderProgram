@@ -10,6 +10,7 @@ public class RainEffect {
     private static boolean active = false;
     private static float rainTime = 0.0f;
     private static float rainIntensity = 0.0f;
+    private static float thunderFlash = 0.0f;
     private static PostChain postChain = null;
     private static final float FADE_SPEED = 0.02f;
 
@@ -47,6 +48,14 @@ public class RainEffect {
                 rainTime -= 10000.0f;
             }
 
+            // Thunder flash: getSkyFlashTime() counts down from ~2 when lightning strikes
+            if (mc.level.isThundering() && mc.level.getSkyFlashTime() > 0) {
+                thunderFlash = Math.min(mc.level.getSkyFlashTime() / 2.0f, 1.0f);
+            } else {
+                // Smooth decay so flash doesn't cut off abruptly
+                thunderFlash = Math.max(thunderFlash - 0.15f, 0.0f);
+            }
+
             if (!exposedToRain && rainIntensity <= 0.0f) {
                 deactivate();
             }
@@ -56,6 +65,7 @@ public class RainEffect {
     private static void activate() {
         active = true;
         rainIntensity = 0.0f;
+        thunderFlash = 0.0f;
 
         Minecraft mc = Minecraft.getInstance();
         try {
@@ -73,6 +83,7 @@ public class RainEffect {
         if (!active) return;
         active = false;
         rainIntensity = 0.0f;
+        thunderFlash = 0.0f;
 
         Minecraft mc = Minecraft.getInstance();
         PostChain current = mc.gameRenderer.currentEffect();
@@ -90,10 +101,12 @@ public class RainEffect {
             active = false;
             postChain = null;
             rainIntensity = 0.0f;
+            thunderFlash = 0.0f;
             return;
         }
 
         postChain.setUniform("RainTime", rainTime);
         postChain.setUniform("RainIntensity", rainIntensity);
+        postChain.setUniform("ThunderFlash", thunderFlash);
     }
 }

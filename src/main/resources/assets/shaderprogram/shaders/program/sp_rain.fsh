@@ -9,6 +9,7 @@ uniform vec2 InSize;
 uniform vec2 OutSize;
 uniform float RainTime;
 uniform float RainIntensity;
+uniform float ThunderFlash;
 
 in vec2 texCoord;
 out vec4 fragColor;
@@ -150,13 +151,8 @@ void main() {
 
     vec3 col = sampleBlurred((UV + n) * tScale, focus);
 
-    float lt = (T + 3.0) * 0.5;
-    float colFade = sin(lt * 0.2) * 0.5 + 0.5;
-    col *= mix(vec3(1.0), vec3(0.8, 0.9, 1.3), colFade);
-
-    float lightning = sin(lt * sin(lt * 10.0));
-    lightning *= pow(max(0.0, sin(lt + sin(lt))), 10.0);
-    col *= 1.0 + lightning * 0.3;
+    // Lightning flash — driven by actual in-game thunder strikes
+    col *= 1.0 + ThunderFlash * 0.4;
 
     vec2 vUV = UV - 0.5;
     col *= 1.0 - dot(vUV, vUV) * 0.4;

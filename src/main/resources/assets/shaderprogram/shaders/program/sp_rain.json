@@ -15,6 +15,7 @@
     { "name": "InSize", "type": "float", "count": 2, "values": [1.0, 1.0] },
     { "name": "OutSize", "type": "float", "count": 2, "values": [1.0, 1.0] },
     { "name": "RainTime", "type": "float", "count": 1, "values": [0.0] },
-    { "name": "RainIntensity", "type": "float", "count": 1, "values": [0.0] }
+    { "name": "RainIntensity", "type": "float", "count": 1, "values": [0.0] },
+    { "name": "ThunderFlash", "type": "float", "count": 1, "values": [0.0] }
   ]
 }
