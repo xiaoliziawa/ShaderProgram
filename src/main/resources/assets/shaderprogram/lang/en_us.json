@@ -6,5 +6,6 @@
   "key.shaderprogram.cycle_tile": "Cycle Tile",
   "key.categories.shaderprogram": "ShaderProgram",
   "entity.shaderprogram.black_hole": "Black Hole",
-  "entity.shaderprogram.sun": "Sun"
+  "entity.shaderprogram.sun": "Sun",
+  "key.shaderprogram.toggle_aurora": "Toggle Aurora"
 }

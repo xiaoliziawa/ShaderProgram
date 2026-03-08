@@ -73,6 +73,13 @@ public class ClientEvents {
             "key.categories.shaderprogram"
     );
 
+    private static final KeyMapping AURORA_KEY = new KeyMapping(
+            "key.shaderprogram.toggle_aurora",
+            InputConstants.Type.KEYSYM,
+            GLFW.GLFW_KEY_J,
+            "key.categories.shaderprogram"
+    );
+
     @EventBusSubscriber(modid = Shaderprogram.MODID, value = Dist.CLIENT)
     public static class ModBusEvents {
 
@@ -84,6 +91,7 @@ public class ClientEvents {
             event.register(PIXELATE_KEY);
             event.register(SEASCAPE_KEY);
             event.register(WARP_KEY);
+            event.register(AURORA_KEY);
         }
 
         @SubscribeEvent
@@ -131,6 +139,12 @@ public class ClientEvents {
                             DefaultVertexFormat.POSITION),
                     CosmicTooltipShader::onShaderLoaded
             );
+            event.registerShader(
+                    new ShaderInstance(event.getResourceProvider(),
+                            "shaderprogram:aurora_sky",
+                            DefaultVertexFormat.POSITION),
+                    instance -> AuroraSkyShader.instance = instance
+            );
         }
     }
 
@@ -160,6 +174,9 @@ public class ClientEvents {
             while (WARP_KEY.consumeClick()) {
                 WarpEffect.toggle();
             }
+            while (AURORA_KEY.consumeClick()) {
+                AuroraSkyEffect.toggle();
+            }
             SynthwaveEffect.tick();
             TimeStopEffect.tick();
             PixelateEffect.tick();
@@ -179,6 +196,7 @@ public class ClientEvents {
                 WarpEffect.applyPostUniforms();
                 RainEffect.applyPostUniforms();
                 SynthwaveSkyRenderer.render(event);
+                AuroraSkyRenderer.render(event);
             }
             if (event.getStage() == RenderLevelStageEvent.Stage.AFTER_WEATHER) {
                 renderGlassSpheres(event);

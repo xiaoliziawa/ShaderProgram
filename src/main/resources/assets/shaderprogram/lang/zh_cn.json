@@ -6,5 +6,6 @@
   "key.shaderprogram.cycle_tile": "切换瓷砖效果",
   "key.categories.shaderprogram": "ShaderProgram",
   "entity.shaderprogram.black_hole": "\u9ed1\u6d1e",
-  "entity.shaderprogram.sun": "\u592a\u9633"
+  "entity.shaderprogram.sun": "\u592a\u9633",
+  "key.shaderprogram.toggle_aurora": "\u5207\u6362\u6781\u5149\u6548\u679c"
 }
